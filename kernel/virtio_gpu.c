@@ -505,8 +505,9 @@ void virtio_gpu_init(void)
     // gpu_cmd_attach() will also record them in attach_buf.entries[] so they
     // can be reused to restore the backing after a flip.
     static struct virtio_gpu_mem_entry fb_entries[FB_PAGES];
-    for (int i = 0; i < FB_PAGES; i++) {
-        fb_entries[i].addr   = (uint64)fb[i];
+    for (int i = 0; i < FB_PAGES; i++)
+    {
+        fb_entries[i].addr = (uint64)fb[i];
         fb_entries[i].length = PGSIZE;
     }
     gpu_cmd_attach(fb_entries, FB_PAGES);
@@ -577,4 +578,25 @@ void display_daemon(void)
         virtio_gpu_commit();
         acquire(&tickslock);
     }
+}
+
+// Maps the kernel's framebuffer pages into a user process's pagetable.
+int map_framebuffer_to_user_pagetable(pagetable_t pagetable, uint64 va)
+{
+    uint64 a = va;
+    for (int i = 0; i < FB_PAGES; i++)
+    {
+        // Map each physical page to sequential virtual pages in the user process's pagetable.
+        if (mappages(pagetable, a, PGSIZE, (uint64)fb[i], PTE_U | PTE_R | PTE_W) != 0)
+        {
+            // If mapping fails, unmap any pages that were mapped previously.
+            if (i > 0)
+            {
+                uvmunmap(pagetable, va, i, 0); // do_free = 0, don't free the physical pages of the framebuffer.
+            }
+            return -1;
+        }
+        a += PGSIZE;
+    }
+    return 0;
 }
