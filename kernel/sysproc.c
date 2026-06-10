@@ -105,7 +105,38 @@ TODO: Students implement this syscall.
 uint64
 sys_flip_display(void)
 {
-  return -1;
+  uint64 buf;
+  struct proc *p = myproc();
+
+  // Parse the *buf argument and validate it:
+  argaddr(0, &buf);
+
+  if (buf % PGSIZE != 0 ||                        // Must be page-aligned
+      buf >= MAXVA || buf + 300 * PGSIZE > MAXVA) // Must be within valid userspace bounds
+    return -1;
+
+  // Find the physical addresses of the 300 pages starting at buf. Validate that all pages are mapped and user-accessible.
+  uint64 physical_addrs[300];
+  for (int i = 0; i < 300; i++)
+  {
+    uint64 va = buf + i * PGSIZE;
+
+    // Retrieve the physical address corresponding to this virtual address from the process's pagetable
+    uint64 pa = walkaddr(p->pagetable, va);
+
+    if (pa == 0) // Check if page is unmapped or lacks user permissions
+      return -1;
+
+    physical_addrs[i] = pa;
+  }
+
+  // Tell the GPU to flip to these physical pages
+  virtio_gpu_flip(physical_addrs);
+
+  // Mark the process as having flipped the display for future reference.
+  p->flipped_gpu = 1;
+
+  return 0;
 }
 
 /*

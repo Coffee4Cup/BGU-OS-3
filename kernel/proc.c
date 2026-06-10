@@ -153,6 +153,9 @@ found:
   // Initialize the framebuffer virtual address to 0 (not mapped).
   p->fbva = 0;
 
+  // Initialize the GPU flip flag to 0 (not flipped).
+  p->flipped_gpu = 0;
+
   return p;
 }
 
@@ -171,6 +174,13 @@ freeproc(struct proc *p)
   {
     uvmunmap(p->pagetable, p->fbva, 300, 0);
     p->fbva = 0;
+  }
+
+  // If the process has flipped the GPU to user pages, restore it back to the default kernel framebuffer.
+  if (p->flipped_gpu == 1)
+  {
+    virtio_gpu_restore();
+    p->flipped_gpu = 0;
   }
 
   if (p->pagetable)

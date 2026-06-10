@@ -600,3 +600,39 @@ int map_framebuffer_to_user_pagetable(pagetable_t pagetable, uint64 va)
     }
     return 0;
 }
+
+// Flips the GPU hardware to read from the user's physical pages
+void virtio_gpu_flip(uint64 *phys_addrs)
+{
+    static struct virtio_gpu_mem_entry user_entries[FB_PAGES];
+
+    // Map the user-provided physical addresses into gpu memory entries
+    for (int i = 0; i < FB_PAGES; i++)
+    {
+        user_entries[i].addr = phys_addrs[i];
+        user_entries[i].length = PGSIZE;
+        user_entries[i].padding = 0;
+    }
+
+    // Detach the current kernel framebuffer backing and attach the new user-provided backing.
+    gpu_cmd_detach();
+    gpu_cmd_attach(user_entries, FB_PAGES);
+}
+
+// Restores the GPU hardware to read from the default kernel fb[] array
+void virtio_gpu_restore(void)
+{
+    static struct virtio_gpu_mem_entry kernel_entries[FB_PAGES];
+
+    // Map the kernel framebuffer pages into gpu memory entries
+    for (int i = 0; i < FB_PAGES; i++)
+    {
+        kernel_entries[i].addr = (uint64)fb[i];
+        kernel_entries[i].length = PGSIZE;
+        kernel_entries[i].padding = 0;
+    }
+
+    // Detach the current user framebuffer backing and re-attach the kernel framebuffer backing.
+    gpu_cmd_detach();
+    gpu_cmd_attach(kernel_entries, FB_PAGES);
+}

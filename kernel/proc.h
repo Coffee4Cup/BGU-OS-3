@@ -118,4 +118,5 @@ struct proc
   char name[16];               // Process name (debugging)
 
   uint64 fbva; // Virtual address of framebuffer mapping (default is 0 if not mapped)
+  int flipped_gpu; // Flag indicating whether the process has flipped the display (default is 0)
 };
